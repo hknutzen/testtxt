@@ -158,6 +158,9 @@ func addElement(v reflect.Value) reflect.Value {
 func setVal(el reflect.Value, name, text string) error {
 	for _, f := range reflect.VisibleFields(el.Type()) {
 		if toSnakeCase(f.Name) == name {
+			if !f.IsExported() {
+				return fmt.Errorf("struct field %q must be exported", f.Name)
+			}
 			v := el.FieldByIndex(f.Index)
 			switch v.Kind() {
 			case reflect.String:

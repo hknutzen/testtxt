@@ -31,6 +31,7 @@ import (
 	"path"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -165,6 +166,12 @@ func setVal(el reflect.Value, name, text string) error {
 			switch v.Kind() {
 			case reflect.String:
 				v.SetString(text)
+			case reflect.Int:
+				i, err := strconv.ParseInt(text, 10, 64)
+				if err != nil {
+					fmt.Errorf("invalid value for struct field %q: %v", f.Name, err)
+				}
+				v.SetInt(i)
 			case reflect.Bool:
 				v.SetBool(true)
 			default:

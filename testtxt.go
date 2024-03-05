@@ -39,22 +39,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func GetFiles(dataDir string) []string {
-	files, err := os.ReadDir(dataDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var names []string
-	for _, f := range files {
-		name := f.Name()
-		if strings.HasSuffix(name, ".t") {
-			name = path.Join(dataDir, name)
-			names = append(names, name)
-		}
-	}
-	return names
-}
-
 // ParseFile parses the named file as a list of test descriptions.
 func ParseFile(file string, l any) error {
 	data, err := os.ReadFile(file)

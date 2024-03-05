@@ -33,6 +33,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"testing"
 	"text/template"
 	"time"
 
@@ -387,7 +388,7 @@ func (s *state) getLine() string {
 // If no markers are given, a file named single is created.
 // If single was used it returns path of single, otherwise returns
 // path of inDir.
-func PrepareInDir(inDir, single, input string) string {
+func PrepareInDir(t *testing.T, inDir, single, input string) string {
 	if input == "NONE" {
 		input = ""
 	}
@@ -397,10 +398,10 @@ func PrepareInDir(inDir, single, input string) string {
 	write := func(file, data string) {
 		dir := path.Dir(file)
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			log.Fatalf("Can't create directory for '%s': %v", file, err)
+			t.Fatalf("Can't create directory for '%s': %v", file, err)
 		}
 		if err := os.WriteFile(file, []byte(data), 0644); err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 	}
 
@@ -411,7 +412,7 @@ func PrepareInDir(inDir, single, input string) string {
 		return file
 	}
 	if il[0][0] != 0 {
-		log.Fatal("Missing file marker in first line")
+		t.Fatal("Missing file marker in first line")
 	}
 	for i, p := range il {
 		marker := input[p[0] : p[1]-1] // without trailing "\n"

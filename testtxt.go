@@ -255,10 +255,8 @@ func (s *state) readTemplName() (string, error) {
 	line := s.getLine()
 	s.rest = s.rest[len(line)-1:] // don't skip trailing newline
 	name := strings.TrimSpace(line)
-	for _, ch := range name {
-		if !(isLetter(ch) || isDecimal(ch)) {
-			return "", errors.New("invalid name after =TEMPL=: " + name)
-		}
+	if !isName(name) {
+		return "", errors.New("invalid name after =TEMPL=: " + name)
 	}
 	return name, nil
 }

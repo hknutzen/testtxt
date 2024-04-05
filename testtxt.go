@@ -26,7 +26,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"reflect"
@@ -48,11 +47,11 @@ func ParseFile(file string, l any) error {
 	}
 	v := reflect.ValueOf(l)
 	if v.Kind() != reflect.Pointer {
-		return fmt.Errorf("Expecting pointer to empty slice")
+		return fmt.Errorf("expecting pointer to empty slice")
 	}
 	v = v.Elem()
 	if v.Kind() != reflect.Slice || v.Len() != 0 {
-		return fmt.Errorf("Expecting pointer to empty slice")
+		return fmt.Errorf("expecting pointer to empty slice")
 	}
 	s := &state{
 		src:       data,
@@ -75,41 +74,50 @@ type state struct {
 func (s *state) parse() error {
 	el := addElement(s.slice)
 	if el.Kind() != reflect.Struct {
-		return fmt.Errorf("Expecting slice of struct.")
+		return fmt.Errorf("expecting slice of struct")
 	}
 	fields := reflect.VisibleFields(el.Type())
 	if len(fields) == 0 {
-		return fmt.Errorf("Expecting struct with at least one field.")
+		return fmt.Errorf("expecting struct with at least one field")
 	}
-	title := strings.ToUpper(fields[0].Name)
+	title := toSnakeCase(fields[0].Name)
 	var seen map[string]bool
 	tVal := ""
 	first := true
 	for {
+		withContext := func(err error) error {
+			where := ""
+			if tVal != "" {
+				where = fmt.Sprintf("in test with =%s=%s", title, tVal)
+			} else {
+				where = fmt.Sprintf("in file %q", s.filename)
+			}
+			return fmt.Errorf("%v %s", err, where)
+		}
 		name, err := s.readDef()
 		if err != nil {
 			return err
 		}
 		if name == "" { // EOF
 			if first {
-				return fmt.Errorf("missing =%s= in first test", title)
+				return fmt.Errorf("missing =%s= in first test of file %q",
+					title, s.filename)
 			}
 			return nil
 		}
 		switch name {
 		case "TEMPL":
 			if err := s.templDef(); err != nil {
-				return err
+				return withContext(err)
 			}
 			continue
 		case "SUBST":
-			return fmt.Errorf(
-				"=SUBST= is only valid at bottom of text block in test with =%s=%s",
-				title, tVal)
+			return withContext(errors.New(
+				"=SUBST= is only valid at bottom of text block"))
 		}
 		text, err := s.readExpandedText()
 		if err != nil {
-			return err
+			return withContext(err)
 		}
 		if name == title {
 			if seen[name] {
@@ -119,14 +127,15 @@ func (s *state) parse() error {
 			first = false
 			seen = make(map[string]bool)
 		} else if first {
-			return fmt.Errorf("must define =%s= before =%s=", title, name)
+			return withContext(
+				fmt.Errorf("must define =%s= before =%s=", title, name))
 		}
 		if seen[name] {
 			return fmt.Errorf(
 				"found multiple =%s= in test with =%s=%s", name, title, tVal)
 		}
 		if err := setVal(el, name, text); err != nil {
-			return fmt.Errorf("%v in test with =%s=%s", err, title, tVal)
+			return withContext(err)
 		}
 		seen[name] = true
 	}
@@ -152,15 +161,16 @@ func setVal(el reflect.Value, name, text string) error {
 			case reflect.String:
 				v.SetString(text)
 			case reflect.Int:
-				i, err := strconv.ParseInt(text, 10, 64)
+				i, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
 				if err != nil {
-					fmt.Errorf("invalid value for struct field %q: %v", f.Name, err)
+					return fmt.Errorf(
+						"invalid value for struct field %q: %v", f.Name, err)
 				}
 				v.SetInt(i)
 			case reflect.Bool:
 				v.SetBool(true)
 			default:
-				return fmt.Errorf("unexpected type %v of struct field %q",
+				return fmt.Errorf("unexpected type %q of struct field %q",
 					v.Kind(), f.Name)
 			}
 			return nil
@@ -188,8 +198,8 @@ func (s *state) readDef() (string, error) {
 		} else {
 			line = string(s.rest[:idx])
 		}
-		line = strings.TrimSpace(line)
-		if line == "" || line[0] == '#' {
+		line2 := strings.TrimSpace(line)
+		if line2 == "" || line2[0] == '#' {
 			if idx == -1 {
 				s.rest = s.rest[len(s.rest):]
 				// Found EOF.
@@ -205,7 +215,7 @@ func (s *state) readDef() (string, error) {
 	name := s.checkDef(line)
 	if name == "" {
 		nr := s.currentLine()
-		return "", fmt.Errorf("expected token '=...=' at line %d of file %s: %s",
+		return "", fmt.Errorf("expecting token '=...=' at line %d of file %q: %s",
 			nr, s.filename, line)
 	}
 	s.rest = s.rest[len(name)+2:]
@@ -328,20 +338,19 @@ func (s *state) doTemplSubst(text string) (string, error) {
 			name = pair[:i]
 			y := pair[i+1:]
 			if err := yaml.Unmarshal([]byte(y), &data); err != nil {
-				log.Fatalf(
-					"Invalid YAML data in call to template [[%s]] of file %s: %v",
-					pair, s.filename, err)
+				return "", fmt.Errorf(
+					"invalid YAML data in call to template\n[[%s]]\n: %q", pair, err)
 			}
 		} else {
 			name = pair
 		}
 		t := s.templates[name]
 		if t == nil {
-			log.Fatalf("Calling unknown template %s", name)
+			return "", fmt.Errorf("calling unknown template %q", name)
 		}
 		var b strings.Builder
 		if err := t.Execute(&b, data); err != nil {
-			log.Fatalf("Executing template %s: %v", name, err)
+			return "", fmt.Errorf("can't execute template %q: %v", name, err)
 		}
 		result.WriteString(b.String())
 	}

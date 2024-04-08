@@ -235,7 +235,7 @@ func (s *state) checkDef(line string) string {
 		return ""
 	}
 	name := line[1 : idx+1]
-	if isName(name) {
+	if len(name) > 0 && isName(name) {
 		return name
 	}
 	return ""
@@ -251,6 +251,9 @@ func (s *state) templDef() error {
 		return err
 	}
 	text = strings.TrimSuffix(text, "\n")
+	if len(text) == 0 {
+		return fmt.Errorf("missing text after =TEMPL=%s", name)
+	}
 	fMap := template.FuncMap{
 		// Get current date shifted by 'offset' days.
 		"DATE": func(offset int) string {
@@ -263,11 +266,21 @@ func (s *state) templDef() error {
 }
 
 func (s *state) readTemplName() (string, error) {
-	line := s.getLine()
-	s.rest = s.rest[len(line)-1:] // don't skip trailing newline
+	var line string
+	idx := bytes.IndexByte(s.rest, byte('\n'))
+	if idx == -1 {
+		line = string(s.rest)
+		s.rest = s.rest[len(s.rest):]
+	} else {
+		line = string(s.rest[:idx])
+		s.rest = s.rest[idx:] // don't skip trailing newline
+	}
 	name := strings.TrimSpace(line)
+	if len(name) == 0 {
+		return "", errors.New("missing name after =TEMPL=")
+	}
 	if !isName(name) {
-		return "", errors.New("invalid name after =TEMPL=: " + name)
+		return "", fmt.Errorf("invalid name after =TEMPL=: %q", name)
 	}
 	return name, nil
 }
@@ -320,15 +333,17 @@ func (s *state) readText() string {
 	}
 }
 
+// Match "]" in "]]]" as part of YAML sequence only after whitespace.
+var templRx = regexp.MustCompile(`(?is)\[\[[a-z0-9_]+(\s+.*?\]?)?\]\]`)
+
 // Substitute occurrences of [[name yaml-data]] by text of evaluated
 // named template.
 func (s *state) doTemplSubst(text string) (string, error) {
 	var result strings.Builder
+	// Position of text after previous occurrence of [[..]]
 	prevIdx := 0
 
-	// Take "]" in "]]]" as part of YAML sequence.
-	re := regexp.MustCompile(`(?s)\[\[.*?\]?\]\]`)
-	il := re.FindAllStringIndex(text, -1)
+	il := templRx.FindAllStringIndex(text, -1)
 	for _, p := range il {
 		result.WriteString(text[prevIdx:p[0]])
 		prevIdx = p[1]

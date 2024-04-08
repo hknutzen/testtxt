@@ -141,6 +141,42 @@ element={{.}}
 		},
 	},
 	{
+		title: "Call of template is located in brackets",
+		input: `
+=TEMPL=xx
+abc
+=TITLE=t1
+=INPUT= [[[xx]]] [[[[xx]]]]
+`,
+		result: &[]descr{
+			{Title: "t1", Input: "[abc] [[abc]]"},
+		},
+	},
+	{
+		title: "Mixed brackets in YAML and surrounding text",
+		input: `
+=TEMPL=xx
+--{{.}}--
+=TITLE=t1
+=INPUT= [[[xx [ARG]]]]
+`,
+		result: &[]descr{
+			{Title: "t1", Input: "[--[ARG]--]"},
+		},
+	},
+	{
+		title: "Call template with empty parameter",
+		input: `
+=TEMPL=xx
+--{{.}}--
+=TITLE=t1
+=INPUT= [[xx  ]]
+`,
+		result: &[]descr{
+			{Title: "t1", Input: "--<no value>--"},
+		},
+	},
+	{
 		title:  "Title with mixed case",
 		descr:  &[]struct{ MixedCase string }{},
 		input:  "=MIXED_CASE= test",
@@ -222,9 +258,14 @@ abc
 		error: `expecting token '=...=' at line 4 of file "file": ==TITLE test`,
 	},
 	{
-		title: "Indented title",
+		title: "Ignore indented title",
 		input: `  =TITLE= test`,
 		error: `expecting token '=...=' at line 1 of file "file":   =TITLE= test`,
+	},
+	{
+		title: "Ignore incomplete title",
+		input: `=TITLE test`,
+		error: `expecting token '=...=' at line 1 of file "file": =TITLE test`,
 	},
 	{
 		title: "Whitespace in name",
@@ -285,6 +326,30 @@ def
 =input=abc
 `,
 		error: "unexpected =input= in test with =TITLE=test",
+	},
+	{
+		title: "Missing template name",
+		input: `=TEMPL=`,
+		error: `missing name after =TEMPL= in file "file"`,
+	},
+	{
+		title: "Invalid template name",
+		input: `=TEMPL=++`,
+		error: `invalid name after =TEMPL=: "++" in file "file"`,
+	},
+	{
+		title: "Missing template body",
+		input: `=TEMPL=xx`,
+		error: `missing text after =TEMPL=xx in file "file"`,
+	},
+	{
+		title: "Invalid template body",
+		input: `
+=TEMPL=xx
+abc
+=SUBST=//
+`,
+		error: `invalid substitution: =SUBST=// in file "file"`,
 	},
 	{
 		title: "Calling unknown template",

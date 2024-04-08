@@ -355,7 +355,7 @@ func (s *state) doTemplSubst(text string) (string, error) {
 			y := pair[i+1:]
 			if err := yaml.Unmarshal([]byte(y), &data); err != nil {
 				return "", fmt.Errorf(
-					"invalid YAML data in call to template\n[[%s]]\n: %q", pair, err)
+					"invalid YAML data %q in call to template %q:\n %q", y, name, err)
 			}
 		} else {
 			name = pair

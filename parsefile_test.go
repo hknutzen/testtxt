@@ -370,13 +370,19 @@ abc
 --
 ]]
 `,
-		error: `invalid YAML data in call to template
-[[xx
-- a
-- b
---
-]]
-: "yaml: line 3: could not find expected ':'" in test with =TITLE=t1`,
+		error: `invalid YAML data "- a\n- b\n--\n" in call to template "xx":
+ "yaml: line 3: could not find expected ':'" in test with =TITLE=t1`,
+	},
+	{
+		title: "Two brackets in YAML not supported",
+		input: `
+=TEMPL=xx
+--{{.}}--
+=TITLE=t1
+=INPUT= [[[xx [[ARG]]]]]
+`,
+		error: `invalid YAML data "[[ARG]" in call to template "xx":
+ "yaml: line 1: did not find expected ',' or ']'" in test with =TITLE=t1`,
 	},
 	{
 		title: "Error while executing template",

@@ -1,0 +1,23 @@
+on:
+  push:
+    branches: [ master ]
+
+name: tests
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Calc coverage
+        run: go test -coverprofile=c.out
+      - name: Upload coverage
+        uses: coverallsapp/github-action@v2.2.3
+        with:
+          github-token: ${{ secrets.github_token }}
+          file: go/test/c.out
+          format: golang

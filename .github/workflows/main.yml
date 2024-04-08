@@ -19,5 +19,5 @@ jobs:
         uses: coverallsapp/github-action@v2.2.3
         with:
           github-token: ${{ secrets.github_token }}
-          file: go/test/c.out
+          file: c.out
           format: golang

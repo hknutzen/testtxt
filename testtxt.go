@@ -252,6 +252,7 @@ func (s *state) templDef() error {
 	}
 	text = strings.TrimSuffix(text, "\n")
 	fMap := template.FuncMap{
+		// Get current date shifted by 'offset' days.
 		"DATE": func(offset int) string {
 			return time.Now().AddDate(0, 0, offset).Format("2006-01-02")
 		},
@@ -350,7 +351,7 @@ func (s *state) doTemplSubst(text string) (string, error) {
 		}
 		var b strings.Builder
 		if err := t.Execute(&b, data); err != nil {
-			return "", fmt.Errorf("can't execute template %q: %v", name, err)
+			return "", fmt.Errorf("%v", err)
 		}
 		result.WriteString(b.String())
 	}
@@ -358,7 +359,7 @@ func (s *state) doTemplSubst(text string) (string, error) {
 	return result.String(), nil
 }
 
-// Apply one or multiple substitutions to current textblock.
+// Apply one or more substitutions to current textblock.
 func (s *state) applySubst(text string) (string, error) {
 	for {
 		line := s.getLine()
@@ -370,7 +371,7 @@ func (s *state) applySubst(text string) (string, error) {
 		line = line[len("=SUBST="):]
 		line = strings.TrimSpace(line)
 		if len(line) == 0 {
-			return "", fmt.Errorf("invalid empty substitution in %s", s.filename)
+			return "", errors.New("invalid empty substitution")
 		}
 		parts := strings.Split(line[1:], line[0:1])
 		if len(parts) != 3 || parts[2] != "" {

@@ -5,6 +5,7 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -92,7 +93,7 @@ the end
 =INPUT=
 [[input]]++
 =SUBST=/42/100/
-=SUBST=|the end|/e/|
+=SUBST= |the end|/e/|
 `,
 		result: &[]descr{
 			{Title: "t1", Input: "some text\nnumber 42 WINS\nthe end"},
@@ -111,6 +112,32 @@ xx
 `,
 		result: &[]descr{
 			{Title: "t1", Input: "xxxxxx xx"},
+		},
+	},
+	{
+		title: "Template with array as argument",
+		input: `
+=TEMPL=xx
+{{range . -}}
+element={{.}}
+{{end}}
+=END=
+
+=TITLE=t1
+=INPUT=[[xx [a, b, c]]]
+
+=TITLE=t2
+=INPUT=
+[[xx
+- a
+- b
+- c
+]]
+=END=
+`,
+		result: &[]descr{
+			{Title: "t1", Input: "element=a\nelement=b\nelement=c\n"},
+			{Title: "t2", Input: "element=a\nelement=b\nelement=c\n\n"},
 		},
 	},
 	{
@@ -286,6 +313,36 @@ def
 ]]
 : "yaml: line 3: could not find expected ':'" in test with =TITLE=t1`,
 	},
+	{
+		title: "Error while executing template",
+		input: `
+=TEMPL=xx
+abc{{.part}}def
+=TITLE=t1
+=INPUT= [[xx xyz]]
+`,
+		error: `template: xx:1:5: executing "xx" at <.part>: can't evaluate field part in type string in test with =TITLE=t1`,
+	},
+	{
+		title: "Empty substitution",
+		input: `
+=TITLE=t1
+=INPUT=
+abc
+=SUBST=
+`,
+		error: `invalid empty substitution in test with =TITLE=t1`,
+	},
+	{
+		title: "Invalid substitution",
+		input: `
+=TITLE=t1
+=INPUT=
+abc
+=SUBST=/abc/def/i
+`,
+		error: `invalid substitution: =SUBST=/abc/def/i in test with =TITLE=t1`,
+	},
 }
 
 func TestParseFile(t *testing.T) {
@@ -310,6 +367,31 @@ func TestParseFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTemplateDateFunc(t *testing.T) {
+	t.Parallel()
+	input := `
+=TEMPL=disable_at
+disable_at = {{DATE .}}
+=TITLE=t1
+=INPUT=[[disable_at -10]]
+`
+	result := &[]descr{{
+		Title: "t1",
+		Input: "disable_at = " +
+			time.Now().AddDate(0, 0, -10).Format("2006-01-02"),
+	}}
+	d := &[]descr{}
+	workDir := t.TempDir()
+	fName := path.Join(workDir, "file")
+	if err := os.WriteFile(fName, []byte(input), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := ParseFile(fName, d); err != nil {
+		t.Fatal(err)
+	}
+	eq(t, result, d)
 }
 
 func eq(t *testing.T, expected, got any) {

@@ -28,15 +28,17 @@ input string, templates can be defined, using the
 `=TEMPL=<templateName>` marker.  Templates can then be used behind
 any marker `=<MARKER>= [[templateName]]`
 
-If the tool to be tested requires files as input,
-`testtxt.PrepareInDir(t *testing.T, inDir, single, input string)` can be
-used to create an input directory inDir and fill it with one or more
-input files. For one Input file, the input string is written into a
-file named <single>. Several files are indicated within the input
+If the tool to be tested requires files as input, a utility function
+is provided, to create one or multiple files with given input.
+Use `testtxt.PrepareFileOrDir(t *testing.T, dst, input string)`
+to create an input directory dst and fill it with one or more
+input files. Several files are indicated within the input
 string by single lines of dashes followed by a filename:
 ```
 --<filename>
 <fileinput>
 ```
+If no markers are given, no directory but a single file named dst
+is created.
 
 [^1]: <https://go.dev/wiki/TableDrivenTests>

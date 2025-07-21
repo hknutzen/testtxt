@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -405,18 +406,18 @@ func (s *state) getLine() string {
 	return string(s.rest[:idx+1])
 }
 
-// Create inDir and fill it with files from input.
-// Parts of input are marked by single lines of dashes
-// followed by a filename.
-// If no markers are given, a file named single is created.
-// If single was used it returns path of single, otherwise returns
-// path of inDir.
-func PrepareInDir(t *testing.T, inDir, single, input string) string {
+// PrepareFileOrDir creates directory dst and fills it with files
+// described by input. Parts of input are marked by single lines of
+// dashes followed by a filename.
+// If no markers are given, no directory but a single file named dst
+// is created.
+// If input is string "NONE", input is assumed to be the empty string.
+func PrepareFileOrDir(t *testing.T, dst, input string) {
 	if input == "NONE" {
 		input = ""
 	}
 	re := regexp.MustCompile(`(?ms)^-+[ ]*\S+[ ]*\n`)
-	il := re.FindAllStringIndex(input, -1)
+	idxList := re.FindAllStringIndex(input, -1)
 
 	write := func(file, data string) {
 		dir := path.Dir(file)
@@ -429,25 +430,43 @@ func PrepareInDir(t *testing.T, inDir, single, input string) string {
 	}
 
 	// No filename
-	if il == nil {
-		file := path.Join(inDir, single)
-		write(file, input)
-		return file
+	if idxList == nil {
+		write(dst, input)
+		return
 	}
-	if il[0][0] != 0 {
+	if idxList[0][0] != 0 {
 		t.Fatal("Missing file marker in first line")
 	}
-	for i, p := range il {
+	for i, p := range idxList {
 		marker := input[p[0] : p[1]-1] // without trailing "\n"
 		pName := strings.Trim(marker, "- ")
-		file := path.Join(inDir, pName)
+		file := path.Join(dst, pName)
 		start := p[1]
 		end := len(input)
-		if i+1 < len(il) {
-			end = il[i+1][0]
+		if i+1 < len(idxList) {
+			end = idxList[i+1][0]
 		}
 		data := input[start:end]
 		write(file, data)
 	}
-	return inDir
+	return
+}
+
+// Create inDir and fill it with files described by input.
+// Parts of input are marked by single lines of dashes
+// followed by a filename.
+// If no markers are given, a file named single is created inside inDir.
+// If single was created, it returns path of single, otherwise returns
+// path of inDir.
+func PrepareInDir(t *testing.T, inDir, single, input string) string {
+	PrepareFileOrDir(t, inDir, input)
+	if s, _ := os.Stat(inDir); s.IsDir() {
+		return inDir
+	}
+	tmp := inDir + ".tmp"
+	os.Rename(inDir, tmp)
+	os.MkdirAll(inDir, 0755)
+	file := filepath.Join(inDir, single)
+	os.Rename(tmp, file)
+	return file
 }
